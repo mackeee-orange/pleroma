@@ -385,7 +385,7 @@ defmodule Pleroma.Web.TwitterAPI.ControllerTest do
 
       errors = json_response(conn, 400)
 
-      assert is_binary(errors["error"])
+      assert errors["error"]
     end
   end
 

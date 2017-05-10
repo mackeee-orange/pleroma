@@ -165,53 +165,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     assert status == ActivityRepresenter.to_map(activity, %{for: user, user: actor})
   end
 
-  test "Follow another user using user_id" do
-    user = insert(:user)
-    followed = insert(:user)
-
-    {:ok, user, followed, _activity } = TwitterAPI.follow(user, %{"user_id" => followed.id})
-    assert user.following == [User.ap_followers(followed)]
-
-    { :error, msg } = TwitterAPI.follow(user, %{"user_id" => followed.id})
-    assert msg == "Could not follow user: #{followed.nickname} is already on your list."
-  end
-
-  test "Follow another user using screen_name" do
-    user = insert(:user)
-    followed = insert(:user)
-
-    {:ok, user, followed, _activity } = TwitterAPI.follow(user, %{"screen_name" => followed.nickname})
-    assert user.following == [User.ap_followers(followed)]
-
-    { :error, msg } = TwitterAPI.follow(user, %{"screen_name" => followed.nickname})
-    assert msg == "Could not follow user: #{followed.nickname} is already on your list."
-  end
-
-  test "Unfollow another user using user_id" do
-    unfollowed = insert(:user)
-    user = insert(:user, %{following: [User.ap_followers(unfollowed)]})
-    ActivityPub.follow(user, unfollowed)
-
-    {:ok, user, unfollowed } = TwitterAPI.unfollow(user, %{"user_id" => unfollowed.id})
-    assert user.following == []
-
-    { :error, msg } = TwitterAPI.unfollow(user, %{"user_id" => unfollowed.id})
-    assert msg == "Not subscribed!"
-  end
-
-  test "Unfollow another user using screen_name" do
-    unfollowed = insert(:user)
-    user = insert(:user, %{following: [User.ap_followers(unfollowed)]})
-
-    ActivityPub.follow(user, unfollowed)
-
-    {:ok, user, unfollowed } = TwitterAPI.unfollow(user, %{"screen_name" => unfollowed.nickname})
-    assert user.following == []
-
-    { :error, msg } = TwitterAPI.unfollow(user, %{"screen_name" => unfollowed.nickname})
-    assert msg == "Not subscribed!"
-  end
-
   test "fetch statuses in a context using the conversation id" do
     {:ok, user} = UserBuilder.insert()
     {:ok, activity} = ActivityBuilder.insert(%{"context" => "2hu"})
@@ -296,37 +249,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     updated_activity = Activity.get_by_ap_id(note_activity.data["id"])
 
     assert status == ActivityRepresenter.to_map(updated_activity, %{user: activity_user, for: user})
-  end
-
-  test "it registers a new user and returns the user." do
-    data = %{
-      "nickname" => "lain",
-      "email" => "lain@wired.jp",
-      "fullname" => "lain iwakura",
-      "bio" => "close the world.",
-      "password" => "bear",
-      "confirm" => "bear"
-    }
-
-    {:ok, user} = TwitterAPI.register_user(data)
-
-    fetched_user = Repo.get_by(User, nickname: "lain")
-    assert user == UserRepresenter.to_map(fetched_user)
-  end
-
-  test "it returns the error on registration problems" do
-    data = %{
-      "nickname" => "lain",
-      "email" => "lain@wired.jp",
-      "fullname" => "lain iwakura",
-      "bio" => "close the world.",
-      "password" => "bear"
-    }
-
-    {:error, error_object} = TwitterAPI.register_user(data)
-
-    assert is_binary(error_object[:error])
-    refute Repo.get_by(User, nickname: "lain")
   end
 
   test "it assigns an integer conversation_id" do

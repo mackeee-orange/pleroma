@@ -1,5 +1,5 @@
 defmodule Pleroma.Web.ActivityPub.ActivityPub do
-  alias Pleroma.{Activity, Repo, Object, Upload, User, Web}
+  alias Pleroma.{Activity, Repo, Object, Upload, User, Web, Misc}
   alias Ecto.{Changeset, UUID}
   import Ecto.Query
   require Logger
@@ -7,7 +7,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
   def insert(map, local \\ true) when is_map(map) do
     map = map
     |> Map.put_new_lazy("id", &generate_activity_id/0)
-    |> Map.put_new_lazy("published", &make_date/0)
+    |> Map.put_new_lazy("published", &Misc.make_date/0)
 
     with %Activity{} = activity <- Activity.get_by_ap_id(map["id"]) do
       Logger.debug(fn -> "Already have activity, #{activity.id}, not inserting." end)
@@ -26,7 +26,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
   end
 
   def create(to, actor, context, object, additional \\ %{}, published \\ nil, local \\ true) do
-    published = published || make_date()
+    published = published || Misc.make_date()
 
     activity = %{
       "type" => "Create",
@@ -224,7 +224,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
       "actor" => follower_id,
       "to" => [followed_id],
       "object" => followed_id,
-      "published" => make_date()
+      "published" => Misc.make_date()
     }
 
     with {:ok, activity} <- insert(data, local) do
@@ -243,7 +243,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
         "actor" => follower.ap_id,
         "to" => [followed.ap_id],
         "object" => follow_activity.data["id"],
-        "published" => make_date()
+        "published" => Misc.make_date()
       }
 
       with {:ok, activity} <- insert(data, local) do
@@ -275,9 +275,5 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
   def upload(file) do
     data = Upload.store(file)
     Repo.insert(%Object{data: data})
-  end
-
-  defp make_date do
-    DateTime.utc_now() |> DateTime.to_iso8601
   end
 end

@@ -6,13 +6,6 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Ecto.Changeset
 
-  def verify_credentials(%{assigns: %{user: user}} = conn, _params) do
-    response = user |> UserRepresenter.to_json(%{for: user})
-
-    conn
-    |> json_reply(200, response)
-  end
-
   def status_update(%{assigns: %{user: user}} = conn, %{"status" => status_text} = status_data) do
     l = status_text |> String.trim |> String.length
     if l > 0 && l < 5000 do
@@ -85,26 +78,6 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
 
     conn
     |> json_reply(200, json)
-  end
-
-  def follow(%{assigns: %{user: user}} = conn, params) do
-    case TwitterAPI.follow(user, params) do
-      {:ok, user, followed, _activity} ->
-        response = followed |> UserRepresenter.to_json(%{for: user})
-        conn
-        |> json_reply(200, response)
-      {:error, msg} -> forbidden_json_reply(conn, msg)
-    end
-  end
-
-  def unfollow(%{assigns: %{user: user}} = conn, params) do
-    case TwitterAPI.unfollow(user, params) do
-      {:ok, user, unfollowed} ->
-        response = unfollowed |> UserRepresenter.to_json(%{for: user})
-        conn
-        |> json_reply(200, response)
-      {:error, msg} -> forbidden_json_reply(conn, msg)
-    end
   end
 
   def fetch_status(%{assigns: %{user: user}} = conn, %{"id" => id}) do
@@ -183,28 +156,6 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
 
       |> json_reply(200, response)
     end
-  end
-
-  def register(conn, params) do
-    with {:ok, user} <- TwitterAPI.register_user(params) do
-      conn
-      |> json_reply(200, Poison.encode!(user))
-    else
-      {:error, errors} ->
-      conn
-      |> json_reply(400, Poison.encode!(errors))
-    end
-  end
-
-  def update_avatar(%{assigns: %{user: user}} = conn, params) do
-    {:ok, object} = ActivityPub.upload(params)
-    change = Changeset.change(user, %{avatar: object.data})
-    {:ok, user} = Repo.update(change)
-
-    response = Poison.encode!(UserRepresenter.to_map(user, %{for: user}))
-
-    conn
-    |> json_reply(200, response)
   end
 
   defp bad_request_reply(conn, error_message) do

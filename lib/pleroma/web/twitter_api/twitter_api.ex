@@ -1,5 +1,5 @@
 defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
-  alias Pleroma.{User, Activity, Repo, Object}
+  alias Pleroma.{User, Activity, Repo, Object, Misc}
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Pleroma.Web.TwitterAPI.Representers.{ActivityRepresenter, UserRepresenter}
 
@@ -50,7 +50,7 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     |> add_attachments(attachments)
 
     to = to_for_user_and_mentions(user, mentions)
-    date = make_date()
+    date = Misc.make_date()
 
     inReplyTo = get_replied_to_activity(data["in_reply_to_status_id"])
 
@@ -130,33 +130,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
   def fetch_status(user, id) do
     with %Activity{} = activity <- Repo.get(Activity, id) do
       activity_to_status(activity, %{for: user})
-    end
-  end
-
-  def follow(%User{} = follower, params) do
-    with {:ok, %User{} = followed} <- get_user(params),
-         {:ok, follower} <- User.follow(follower, followed),
-         {:ok, activity} <- ActivityPub.follow(follower, followed)
-    do
-      {:ok, follower, followed, activity}
-    else
-      err -> err
-    end
-  end
-
-  def unfollow(%User{} = follower, params) do
-    with { :ok, %User{} = unfollowed } <- get_user(params),
-         { :ok, follower, follow_activity } <- User.unfollow(follower, unfollowed),
-         { :ok, _activity } <- ActivityPub.insert(%{
-           "type" => "Undo",
-           "actor" => follower.ap_id,
-           "object" => follow_activity.data["id"], # get latest Follow for these users
-           "published" => make_date()
-         })
-    do
-      { :ok, follower, unfollowed }
-    else
-      err -> err
     end
   end
 
@@ -245,28 +218,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     Enum.reduce(mentions, text, fn ({match, %User{ap_id: ap_id}}, text) -> String.replace(text, match, "<a href='#{ap_id}'>#{match}</a>") end)
   end
 
-  def register_user(params) do
-    params = %{
-      nickname: params["nickname"],
-      name: params["fullname"],
-      bio: params["bio"],
-      email: params["email"],
-      password: params["password"],
-      password_confirmation: params["confirm"]
-    }
-
-    changeset = User.register_changeset(%User{}, params)
-
-    with {:ok, user} <- Repo.insert(changeset) do
-      {:ok, UserRepresenter.to_map(user)}
-    else
-      {:error, changeset} ->
-        errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
-      |> Poison.encode!
-      {:error, %{error: errors}}
-    end
-  end
-
   def get_user(user \\ nil, params) do
     case params do
       %{"user_id" => user_id} ->
@@ -327,10 +278,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     |> Enum.filter(&(&1))
 
     ActivityRepresenter.to_map(activity, Map.merge(opts, %{user: user, mentioned: mentioned_users}))
-  end
-
-  defp make_date do
-    DateTime.utc_now() |> DateTime.to_iso8601
   end
 
   def context_to_conversation_id(context) do

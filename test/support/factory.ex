@@ -1,5 +1,6 @@
 defmodule Pleroma.Factory do
   use ExMachina.Ecto, repo: Pleroma.Repo
+  alias Pleroma.Misc
 
   def user_factory do
     user = %Pleroma.User{
@@ -22,7 +23,7 @@ defmodule Pleroma.Factory do
       "id" => Pleroma.Web.ActivityPub.ActivityPub.generate_object_id,
       "actor" => user.ap_id,
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
-      "published_at" => DateTime.utc_now() |> DateTime.to_iso8601,
+      "published_at" => Misc.make_date(),
       "likes" => [],
       "like_count" => 0,
       "context" => "2hu"
@@ -41,7 +42,7 @@ defmodule Pleroma.Factory do
       "actor" => note.data["actor"],
       "to" => note.data["to"],
       "object" => note.data,
-      "published_at" => DateTime.utc_now() |> DateTime.to_iso8601,
+      "published_at" => Misc.make_date(),
       "context" => note.data["context"]
     }
 
@@ -59,7 +60,7 @@ defmodule Pleroma.Factory do
       "actor" => user.ap_id,
       "type" => "Like",
       "object" => note_activity.data["object"]["id"],
-      "published_at" => DateTime.utc_now() |> DateTime.to_iso8601
+      "published_at" => Misc.make_date()
     }
 
     %Pleroma.Activity{
@@ -76,7 +77,7 @@ defmodule Pleroma.Factory do
       "actor" => follower.ap_id,
       "type" => "Follow",
       "object" => followed.ap_id,
-      "published_at" => DateTime.utc_now() |> DateTime.to_iso8601
+      "published_at" => Misc.make_date()
     }
 
     %Pleroma.Activity{
