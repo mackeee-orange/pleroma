@@ -166,4 +166,29 @@ defmodule Pleroma.User do
       end
     end
   end
+
+  def get_by_params(user \\ nil, params) do
+    case params do
+      %{"user_id" => user_id} ->
+        case target = Repo.get(User, user_id) do
+          nil ->
+            {:not_found, "No user with such user_id"}
+          _ ->
+            {:ok, target}
+        end
+      %{"screen_name" => nickname} ->
+        case target = Repo.get_by(User, nickname: nickname) do
+          nil ->
+            {:not_found, "No user with such screen_name"}
+          _ ->
+            {:ok, target}
+        end
+      _ ->
+        if user do
+          {:ok, user}
+        else
+          {:bad_request, "You need to specify screen_name or user_id"}
+        end
+    end
+  end
 end

@@ -29,13 +29,13 @@ defmodule Pleroma.Web.Router do
     get "/help/test", TwitterAPI.UtilController, :help_test
     get "/statusnet/config", TwitterAPI.UtilController, :config
 
-    get "/statuses/public_timeline", TwitterAPI.Controller, :public_timeline
-    get "/statuses/public_and_external_timeline", TwitterAPI.Controller, :public_and_external_timeline
-    get "/statuses/networkpublic_timeline", TwitterAPI.Controller, :public_and_external_timeline
-    get "/statuses/user_timeline", TwitterAPI.Controller, :user_timeline
+    get "/statuses/public_timeline", TwitterAPI.StatusController, :public_timeline
+    get "/statuses/public_and_external_timeline", TwitterAPI.StatusController, :public_and_external_timeline
+    get "/statuses/networkpublic_timeline", TwitterAPI.StatusController, :public_and_external_timeline
+    get "/statuses/user_timeline", TwitterAPI.StatusController, :user_timeline
 
-    get "/statuses/show/:id", TwitterAPI.Controller, :fetch_status
-    get "/statusnet/conversation/:id", TwitterAPI.Controller, :fetch_conversation
+    get "/statuses/show/:id", TwitterAPI.StatusController, :fetch_status
+    get "/statusnet/conversation/:id", TwitterAPI.StatusController, :fetch_conversation
 
     post "/account/register", TwitterAPI.UserController, :register
   end
@@ -46,13 +46,13 @@ defmodule Pleroma.Web.Router do
     get "/account/verify_credentials", TwitterAPI.UserController, :verify_credentials
     post "/account/verify_credentials", TwitterAPI.UserController, :verify_credentials
 
-    get "/statuses/home_timeline", TwitterAPI.Controller, :friends_timeline
-    get "/statuses/friends_timeline", TwitterAPI.Controller, :friends_timeline
-    get "/statuses/mentions", TwitterAPI.Controller, :mentions_timeline
-    get "/statuses/mentions_timeline", TwitterAPI.Controller, :mentions_timeline
+    get "/statuses/home_timeline", TwitterAPI.StatusController, :friends_timeline
+    get "/statuses/friends_timeline", TwitterAPI.StatusController, :friends_timeline
+    get "/statuses/mentions", TwitterAPI.StatusController, :mentions_timeline
+    get "/statuses/mentions_timeline", TwitterAPI.StatusController, :mentions_timeline
 
-    post "/statuses/update", TwitterAPI.Controller, :status_update
-    post "/statuses/retweet/:id", TwitterAPI.Controller, :retweet
+    post "/statuses/update", TwitterAPI.StatusController, :status_update
+    post "/statuses/retweet/:id", TwitterAPI.StatusController, :retweet
 
     post "/friendships/create", TwitterAPI.UserController, :follow
     post "/friendships/destroy", TwitterAPI.UserController, :unfollow
@@ -60,9 +60,9 @@ defmodule Pleroma.Web.Router do
     post "/statusnet/media/upload", TwitterAPI.Controller, :upload
     post "/media/upload", TwitterAPI.Controller, :upload_json
 
-    post "/favorites/create/:id", TwitterAPI.Controller, :favorite
-    post "/favorites/create", TwitterAPI.Controller, :favorite
-    post "/favorites/destroy/:id", TwitterAPI.Controller, :unfavorite
+    post "/favorites/create/:id", TwitterAPI.StatusController, :favorite
+    post "/favorites/create", TwitterAPI.StatusController, :favorite
+    post "/favorites/destroy/:id", TwitterAPI.StatusController, :unfavorite
 
     post "/qvitter/update_avatar", TwitterAPI.UserController, :update_avatar
   end

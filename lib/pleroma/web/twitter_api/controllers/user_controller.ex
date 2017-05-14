@@ -1,45 +1,48 @@
 defmodule Pleroma.Web.TwitterAPI.UserController do
   use Pleroma.Web, :controller
   alias Ecto.Changeset
-  alias Pleroma.{Repo, User, Misc}
+  alias Pleroma.{Activity, Object, Repo, User, Misc}
   alias Pleroma.Web.ActivityPub.ActivityPub
+  alias Pleroma.Web.TwitterAPI.ErrorView
 
   def verify_credentials(%{assigns: %{user: user}} = conn, _params) do
     render conn, "show.json", %{user: user, for: user}
   end
 
   def follow(%{assigns: %{user: follower}} = conn, params) do
-    with {:ok, %User{} = followed} <- get_user(params),
-         {:ok, follower} <- User.follow(follower, followed),
-         {:ok, activity} <- ActivityPub.follow(follower, followed)
-    do
-      render conn, "show.json", %{user: followed, for: follower}
-    else
-      {:error, message} ->
-        conn
-        |> put_status(:not_found)
-        |> render(Pleroma.Web.TwitterAPI.ErrorView, "error.json",
-                  %{request_path: conn.request_path, message: message})
+    case find_user(conn, params) do
+      {:ok, followed = %User{}} ->
+        case User.follow(follower, followed) do
+          {:ok, follower = %User{}} ->
+            {:ok, _activity} = ActivityPub.follow(follower, followed)
+            render conn, "show.json", %{user: followed, for: follower}
+          {:error, message} ->
+            conn
+            |> put_status(:bad_request)
+            |> render(ErrorView, "error.json", %{request_path: conn.request_path, message: message})
+        end
+      {:error, response} -> response
     end
   end
 
   def unfollow(%{assigns: %{user: follower}} = conn, params) do
-    with { :ok, %User{} = unfollowed } <- get_user(params),
-         { :ok, follower, follow_activity } <- User.unfollow(follower, unfollowed),
-         { :ok, _activity } <- ActivityPub.insert(%{
-               "type" => "Undo",
-               "actor" => follower.ap_id,
-               "object" => follow_activity.data["id"], # get latest Follow for these users
-               "published" => Misc.make_date()
-         })
-    do
-      render conn, "show.json", %{user: unfollowed, for: follower}
-    else
-      {:error, message} ->
-        conn
-        |> put_status(:not_found)
-        |> render(Pleroma.Web.TwitterAPI.ErrorView, "error.json",
-                  %{request_path: conn.request_path, message: message})
+    case find_user(conn, params) do
+      {:ok, unfollowed = %User{ap_id: unfollowed_id}} ->
+        case User.unfollow(follower, unfollowed) do
+          {:ok, follower = %User{ap_id: ap_id}, %Activity{data: %{"id" => id}}} ->
+            {:ok, _activity} = ActivityPub.insert(%{
+              "type" => "Undo",
+              "actor" => ap_id,
+              "object" => id, # get latest Follow for these users
+              "published" => Misc.make_date()
+            })
+            render conn, "show.json", %{user: unfollowed, for: follower}
+          {:error, message} ->
+            conn
+            |> put_status(:bad_request)
+            |> render(ErrorView, "error.json", %{request_path: conn.request_path, message: message})
+        end
+      {:error, response} -> response
     end
   end
 
@@ -62,41 +65,26 @@ defmodule Pleroma.Web.TwitterAPI.UserController do
         errors = Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
         conn
         |> put_status(:bad_request)
-        |> render(Pleroma.Web.TwitterAPI.ErrorView, "error.json",
+        |> render(ErrorView, "error.json",
                   %{request_path: conn.request_path, message: errors})
     end
   end
 
   def update_avatar(%{assigns: %{user: user}} = conn, params) do
-    {:ok, object} = ActivityPub.upload(params)
-    change = Changeset.change(user, %{avatar: object.data})
+    {:ok, %Object{data: data}} = ActivityPub.upload(params)
+    change = Changeset.change(user, %{avatar: data})
     {:ok, user} = Repo.update(change)
-
     render conn, "show.json", %{user: user}
   end
 
-  defp get_user(user \\ nil, params) do
-    case params do
-      %{"user_id" => user_id} ->
-        case target = Repo.get(User, user_id) do
-          nil ->
-            {:error, "No user with such user_id"}
-          _ ->
-            {:ok, target}
-        end
-      %{"screen_name" => nickname} ->
-        case target = Repo.get_by(User, nickname: nickname) do
-          nil ->
-            {:error, "No user with such screen_name"}
-          _ ->
-            {:ok, target}
-        end
-      _ ->
-        if user do
-          {:ok, user}
-        else
-          {:error, "You need to specify screen_name or user_id"}
-        end
+  def find_user(%{assigns: %{user: user}} = conn, params) do
+    case User.get_by_params(user, params) do
+      {:ok, user = %User{}} -> {:ok, user}
+      {status, message} ->
+        response = conn
+        |> put_status(status)
+        |> render(ErrorView, "error.json", %{request_path: conn.request_path, message: message})
+        {:error, response}
     end
   end
 end
