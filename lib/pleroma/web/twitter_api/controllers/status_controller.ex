@@ -1,6 +1,6 @@
 defmodule Pleroma.Web.TwitterAPI.StatusController do
   use Pleroma.Web, :controller
-  alias Pleroma.{Activity, Repo, Object, User, Misc}
+  alias Pleroma.{Activity, Repo, Object, User}
   alias Pleroma.Web.TwitterAPI.{ErrorView, TwitterAPI, UserController}
   alias Pleroma.Web.ActivityPub.ActivityPub
 

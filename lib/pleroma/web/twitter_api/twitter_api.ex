@@ -1,9 +1,6 @@
 defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
   alias Pleroma.{User, Activity, Repo, Object, Misc}
   alias Pleroma.Web.ActivityPub.ActivityPub
-  alias Pleroma.Web.TwitterAPI.Representers.{ActivityRepresenter, UserRepresenter}
-
-  import Ecto.Query
 
   def to_for_user_and_mentions(user, mentions) do
     default_to = [

@@ -27,7 +27,7 @@ defmodule Pleroma.Web.TwitterAPI.UserController do
 
   def unfollow(%{assigns: %{user: follower}} = conn, params) do
     case find_user(conn, params) do
-      {:ok, unfollowed = %User{ap_id: unfollowed_id}} ->
+      {:ok, unfollowed = %User{}} ->
         case User.unfollow(follower, unfollowed) do
           {:ok, follower = %User{ap_id: ap_id}, %Activity{data: %{"id" => id}}} ->
             {:ok, _activity} = ActivityPub.insert(%{

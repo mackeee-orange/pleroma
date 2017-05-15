@@ -13,7 +13,7 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
     }) do
     {activity, user} = render_activity(assigns)
 
-    announced_activity = Activity.get_by_ap_id(ap_id)
+    [announced_activity = %Activity{}] = Activity.all_by_object_ap_id(ap_id)
     text = "#{user.nickname} retweeted a status."
     retweeted_status = render("show.json",
       Map.merge(assigns, %{activity: announced_activity})
@@ -35,8 +35,7 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
     }) do
     {activity, %User{nickname: nickname}} = render_activity(assigns)
     text = "#{nickname} favorited a status."
-
-    %Activity{id: liked_activity_id} = Activity.get_by_ap_id(liked_id)
+    [%Activity{id: liked_activity_id}] = Activity.all_by_object_ap_id(liked_id)
 
     Map.merge(activity, %{
                 "in_reply_to_status_id" => liked_activity_id,
@@ -83,7 +82,10 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
     like_count = object["like_count"] || 0
     favorited = Misc.to_boolean(assigns[:for] && assigns[:for].ap_id in (object["likes"] || []))
 
-    mentions = assigns[:mentions] || []
+    mentions = to
+    |> Enum.map(fn (ap_id) -> User.get_cached_by_ap_id(ap_id) end)
+    |> Enum.filter(&Misc.to_boolean/1)
+
     attentions = to
     |> Enum.map(fn (ap_id) -> Enum.find(mentions, fn(user) -> ap_id == user.ap_id end) end)
     |> Enum.filter(&Misc.to_boolean/1)
@@ -122,10 +124,11 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
 
   defp render_activity(assigns = %{
       activity: activity = %Activity{
+        id: activity_id,
         data: %{"published" => created_at, "id" => external_url, "actor" => actor_id}
       },
     }) do
-    user = User.get_cached_by_ap_id(actor_id)
+    user = %User{} = User.get_cached_by_ap_id(actor_id)
     {%{
       "attachments" => [],
       "attentions" => [],
@@ -133,7 +136,7 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
       "external_url" => external_url,
       "fave_num" => 0,
       "favorited" => false,
-      "id" => activity.id,
+      "id" => activity_id,
       "in_reply_to_status_id" => nil,
       "is_local" => true,
       "is_post_verb" => false,

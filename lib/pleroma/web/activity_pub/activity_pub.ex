@@ -198,7 +198,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
 
     data = if activity_id, do: Map.put(data, "id", activity_id), else: data
 
-    {:ok, activity} = insert(data, local)
+    {:ok, activity = %Activity{}} = insert(data, local)
 
     announcements = [ap_id | (object.data["announcements"] || [])] |> Enum.uniq
 
