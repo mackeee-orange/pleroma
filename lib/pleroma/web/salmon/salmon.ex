@@ -67,8 +67,8 @@ defmodule Pleroma.Web.Salmon do
   end
 
   def encode_key({:RSAPublicKey, modulus, exponent}) do
-    modulus_enc = :binary.encode_unsigned(modulus) |> Base.url_encode64
-    exponent_enc = :binary.encode_unsigned(exponent) |> Base.url_encode64
+    modulus_enc = modulus |> :binary.encode_unsigned |> Base.url_encode64
+    exponent_enc = exponent |> :binary.encode_unsigned |> Base.url_encode64
 
     "RSA.#{modulus_enc}.#{exponent_enc}"
   end
@@ -139,7 +139,8 @@ defmodule Pleroma.Web.Salmon do
 
   def publish(user, activity, poster \\ &@httpoison.post/3)
   def publish(%{info: %{"keys" => keys}} = user, activity, poster) do
-    feed = ActivityRepresenter.to_simple_form(activity, user, true)
+    feed = activity
+    |> ActivityRepresenter.to_simple_form(user, true)
     |> ActivityRepresenter.wrap_with_entry
     |> :xmerl.export_simple(:xmerl_xml)
     |> to_string
@@ -148,7 +149,8 @@ defmodule Pleroma.Web.Salmon do
       {:ok, private, _} = keys_from_pem(keys)
       {:ok, feed} = encode(private, feed)
 
-      remote_users(activity)
+      activity
+      |> remote_users
       |> Enum.each(fn(remote_user) ->
         Task.start(fn ->
           Logger.debug(fn -> "sending salmon to #{remote_user.ap_id}" end)

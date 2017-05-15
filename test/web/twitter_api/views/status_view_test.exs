@@ -3,7 +3,6 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
   alias Pleroma.{User, Activity, Object}
   alias Pleroma.Web.TwitterAPI.{AttachmentView, UserView, StatusView}
   alias Pleroma.Web.ActivityPub.ActivityPub
-  alias Pleroma.Builders.UserBuilder
   import Pleroma.Factory
 
   test "an announce activity" do
@@ -45,7 +44,7 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
   end
 
   test "an activity" do
-    {:ok, user} = UserBuilder.insert
+    user = insert(:user, %{nickname: "dtluna"})
     #   {:ok, mentioned_user } = UserBuilder.insert(%{nickname: "shp", ap_id: "shp"})
     mentioned_user = insert(:user, %{nickname: "shp"})
 
@@ -105,7 +104,6 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
       "id" => activity.id,
       "user" => UserView.render("show.json", %{user: user, for: follower}),
       "is_local" => true,
-      "attentions" => [],
       "statusnet_html" => content_html,
       "text" => content,
       "is_post_verb" => true,

@@ -12,7 +12,8 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
   end
 
   def format_input(text, mentions) do
-    HtmlSanitizeEx.strip_tags(text)
+    text
+    |> HtmlSanitizeEx.strip_tags
     |> String.replace("\n", "<br>")
     |> add_user_links(mentions)
   end
@@ -49,13 +50,13 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     to = to_for_user_and_mentions(user, mentions)
     date = Misc.make_date()
 
-    inReplyTo = get_replied_to_activity(data["in_reply_to_status_id"])
+    in_reply_to = get_replied_to_activity(data["in_reply_to_status_id"])
 
     # Wire up reply info.
     [to, context, object, additional] =
-      if inReplyTo do
-      context = inReplyTo.data["context"]
-      to = to ++ [inReplyTo.data["actor"]]
+      if in_reply_to do
+      context = in_reply_to.data["context"]
+      to = to ++ [in_reply_to.data["actor"]]
 
       object = %{
         "type" => "Note",
@@ -65,8 +66,8 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
         "context" => context,
         "attachment" => attachments,
         "actor" => user.ap_id,
-        "inReplyTo" => inReplyTo.data["object"]["id"],
-        "inReplyToStatusId" => inReplyTo.id,
+        "inReplyTo" => in_reply_to.data["object"]["id"],
+        "inReplyToStatusId" => in_reply_to.id,
       }
       additional = %{}
 
@@ -91,7 +92,8 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     # Modified from https://www.w3.org/TR/html5/forms.html#valid-e-mail-address
     regex = ~r/@[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@?[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*/
 
-    Regex.scan(regex, text)
+    regex
+    |> Regex.scan(text)
     |> List.flatten
     |> Enum.uniq
     |> Enum.map(fn ("@" <> match = full_match) -> {full_match, User.get_cached_by_nickname(match)} end)

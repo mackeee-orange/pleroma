@@ -9,6 +9,8 @@ defmodule Pleroma.Web.TwitterAPI.UserController do
     render conn, "show.json", %{user: user, for: user}
   end
 
+  #TODO: DRY the code
+
   def follow(%{assigns: %{user: follower}} = conn, params) do
     case find_user(conn, params) do
       {:ok, followed = %User{}} ->

@@ -6,11 +6,11 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
 
   def render(
     "show.json",
-    assigns = %{
+    %{
       activity: %Activity{
         data: %{"type" => "Announce", "id" => id, "object" => ap_id}
       },
-    }) do
+    } = assigns) do
     {activity, user} = render_activity(assigns)
 
     [announced_activity = %Activity{}] = Activity.all_by_object_ap_id(ap_id)
@@ -29,10 +29,10 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
 
   def render(
     "show.json",
-    assigns = %{activity: %Activity{
+    %{activity: %Activity{
         data: %{"type" => "Like", "id" => id, "object" => liked_id}
       },
-    }) do
+    } = assigns) do
     {activity, %User{nickname: nickname}} = render_activity(assigns)
     text = "#{nickname} favorited a status."
     [%Activity{id: liked_activity_id}] = Activity.all_by_object_ap_id(liked_id)
@@ -47,11 +47,11 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
 
   def render(
     "show.json",
-    assigns = %{
+    %{
       activity: %Activity{
         data: %{"type" => "Follow", "object" => followed_id}
       }
-    }
+    } = assigns
   ) do
     {activity, %User{nickname: follower_name}} = render_activity(assigns)
     %User{nickname: followed_name} = User.get_cached_by_ap_id(followed_id)
@@ -65,16 +65,16 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
 
   def render(
     "show.json",
-    assigns = %{
+    %{
       activity: %Activity{
         data: %{
           "type" => "Create", "to" => to,
-          "object" => object = %{
+          "object" => %{
             "content" => content
-          }
+          } = object
         }
       }
-    }
+    } = assigns
   ) do
     announcement_count = object["announcement_count"] || 0
     repeated = Misc.to_boolean(assigns[:for] && assigns[:for].ap_id in (object["announcements"] || []))
@@ -107,7 +107,7 @@ defmodule Pleroma.Web.TwitterAPI.StatusView do
              })
   end
 
-  def render("timeline.json", assigns = %{activities: activities}) do
+  def render("timeline.json", %{activities: activities} = assigns) do
     render_many(activities, Pleroma.Web.TwitterAPI.StatusView, "show.json",
                 Map.merge(assigns, %{as: :activity}))
   end

@@ -15,7 +15,7 @@ defmodule Pleroma.Application do
       # Start your own worker by calling: Pleroma.Worker.start_link(arg1, arg2, arg3)
       # worker(Pleroma.Worker, [arg1, arg2, arg3]),
       worker(Cachex, [:user_cache, [
-                         default_ttl: 25000,
+                         default_ttl: 25_000,
                          ttl_interval: 1000,
                          limit: 2500
                        ]]),

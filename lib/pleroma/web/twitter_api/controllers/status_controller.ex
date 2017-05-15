@@ -84,6 +84,8 @@ defmodule Pleroma.Web.TwitterAPI.StatusController do
     end
   end
 
+  #TODO: DRY the code
+
   def favorite(%{assigns: %{user: user}} = conn, %{"id" => id}) do
     case find_activity(conn, id) do
       {:not_found, response} -> response

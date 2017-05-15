@@ -101,7 +101,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
     end)
   end
 
-  def unlike(%User{ap_id: ap_id}, %Object{data: %{ "id" => id}} = object) do
+  def unlike(%User{ap_id: ap_id}, %Object{data: %{"id" => id}} = object) do
     query = from activity in Activity,
       where: fragment("? @> ?", activity.data, ^%{actor: ap_id, object: id, type: "Like"})
 
@@ -157,7 +157,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
       order_by: [desc: :inserted_at]
 
     query = Enum.reduce(recipients, query, fn (recipient, q) ->
-      map = %{ to: [recipient] }
+      map = %{to: [recipient]}
       from activity in q,
       or_where: fragment(~s(? @> ?), activity.data, ^map)
     end)
@@ -258,7 +258,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
 
   def fetch_activities_for_context(context) do
     query = from activity in Activity,
-      where: fragment("? @> ?", activity.data, ^%{ context: context })
+      where: fragment("? @> ?", activity.data, ^%{context: context})
     Repo.all(query)
   end
 

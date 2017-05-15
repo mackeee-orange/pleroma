@@ -99,7 +99,8 @@ defmodule Pleroma.Web.OStatus do
   end
 
   def get_attachments(entry) do
-    :xmerl_xpath.string('/entry/link[@rel="enclosure"]', entry)
+    xpath = :xmerl_xpath.string('/entry/link[@rel="enclosure"]', entry)
+    xpath
     |> Enum.map(fn (enclosure) ->
       with href when not is_nil(href) <- string_from_xpath("/link/@href", enclosure),
            type when not is_nil(type) <- string_from_xpath("/link/@type", enclosure) do
@@ -121,12 +122,12 @@ defmodule Pleroma.Web.OStatus do
 
     [author] = :xmerl_xpath.string('//author[1]', doc)
     {:ok, actor} = find_make_or_update_user(author)
-    inReplyTo = string_from_xpath("//thr:in-reply-to[1]/@ref", entry)
+    in_reply_to = string_from_xpath("//thr:in-reply-to[1]/@ref", entry)
 
-    if !Object.get_cached_by_ap_id(inReplyTo) do
-      inReplyToHref = string_from_xpath("//thr:in-reply-to[1]/@href", entry)
-      if inReplyToHref do
-        fetch_activity_from_html_url(inReplyToHref)
+    if !Object.get_cached_by_ap_id(in_reply_to) do
+      in_reply_to_href = string_from_xpath("//thr:in-reply-to[1]/@href", entry)
+      if in_reply_to_href do
+        fetch_activity_from_html_url(in_reply_to_href)
       end
     end
 
@@ -134,7 +135,7 @@ defmodule Pleroma.Web.OStatus do
 
     attachments = get_attachments(entry)
 
-    context = with %{data: %{"context" => context}} <- Object.get_cached_by_ap_id(inReplyTo) do
+    context = with %{data: %{"context" => context}} <- Object.get_cached_by_ap_id(in_reply_to) do
                 context
               else _e ->
                 if String.length(context) > 0 do
@@ -148,8 +149,8 @@ defmodule Pleroma.Web.OStatus do
       "https://www.w3.org/ns/activitystreams#Public",
       User.ap_followers(actor)
     ]
-
-    mentions = :xmerl_xpath.string('//link[@rel="mentioned" and @ostatus:object-type="http://activitystrea.ms/schema/1.0/person"]', entry)
+    xpath = :xmerl_xpath.string('//link[@rel="mentioned" and @ostatus:object-type="http://activitystrea.ms/schema/1.0/person"]', entry)
+    mentions = xpath
     |> Enum.map(fn(person) -> string_from_xpath("@href", person) end)
 
     to = to ++ mentions
@@ -168,8 +169,8 @@ defmodule Pleroma.Web.OStatus do
       "attachment" => attachments
     }
 
-    object = if inReplyTo do
-      Map.put(object, "inReplyTo", inReplyTo)
+    object = if in_reply_to do
+      Map.put(object, "inReplyTo", in_reply_to)
     else
       object
     end
@@ -245,7 +246,7 @@ defmodule Pleroma.Web.OStatus do
   def gather_user_info(username) do
     with {:ok, webfinger_data} <- WebFinger.finger(username),
          {:ok, feed_data} <- Websub.gather_feed_data(webfinger_data["topic"]) do
-      {:ok, Map.merge(webfinger_data, feed_data) |> Map.put("fqn", username)}
+      {:ok, webfinger_data |> Map.merge(feed_data) |> Map.put("fqn", username)}
     else e ->
       Logger.debug(fn -> "Couldn't gather info for #{username}" end)
       {:error, e}

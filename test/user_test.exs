@@ -9,11 +9,6 @@ defmodule Pleroma.UserTest do
   import Ecto.Query
 
   test "ap_id returns the activity pub id for the user" do
-    host =
-      Application.get_env(:pleroma, Pleroma.Web.Endpoint)
-      |> Keyword.fetch!(:url)
-      |> Keyword.fetch!(:host)
-
     user = UserBuilder.build
 
     expected_ap_id = "#{Pleroma.Web.base_url}/users/#{user.nickname}"

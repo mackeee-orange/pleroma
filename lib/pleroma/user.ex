@@ -123,10 +123,10 @@ defmodule Pleroma.User do
       following = follower.following
       |> List.delete(ap_followers)
 
-      { :ok, follower } = follower
+      {:ok, follower} = follower
       |> follow_changeset(%{following: following})
       |> Repo.update
-      { :ok, follower, ActivityPub.fetch_latest_follow(follower, followed)}
+      {:ok, follower, ActivityPub.fetch_latest_follow(follower, followed)}
     else
       {:error, "Not subscribed!"}
     end

@@ -61,7 +61,8 @@ defmodule Pleroma.Web.Websub do
   end
 
   def sign(secret, doc) do
-    :crypto.hmac(:sha, secret, to_string(doc)) |> Base.encode16 |> String.downcase
+    encrypted_secret = :crypto.hmac(:sha, secret, to_string(doc))
+    encrypted_secret |> Base.encode16 |> String.downcase
   end
 
   def incoming_subscription_request(user, %{"hub.mode" => "subscribe"} = params) do
@@ -135,7 +136,7 @@ defmodule Pleroma.Web.Websub do
         hub: subscribed.info["hub"],
         subscribers: [subscriber.ap_id],
         state: "requested",
-        secret: :crypto.strong_rand_bytes(8) |> Base.url_encode64,
+        secret: Base.url_encode64(:crypto.strong_rand_bytes(8)),
         user: subscribed
       }
       Repo.insert(subscription)
@@ -152,15 +153,15 @@ defmodule Pleroma.Web.Websub do
          hub when not is_nil(hub) <- XML.string_from_xpath(~S{/feed/link[@rel="hub"]/@href}, doc) do
 
       name = XML.string_from_xpath("/feed/author[1]/name", doc)
-      preferredUsername = XML.string_from_xpath("/feed/author[1]/poco:preferredUsername", doc)
-      displayName = XML.string_from_xpath("/feed/author[1]/poco:displayName", doc)
+      preferred_username = XML.string_from_xpath("/feed/author[1]/poco:preferredUsername", doc)
+      display_name = XML.string_from_xpath("/feed/author[1]/poco:displayName", doc)
       avatar = OStatus.make_avatar_object(doc)
 
       {:ok, %{
         "uri" => uri,
         "hub" => hub,
-        "nickname" => preferredUsername || name,
-        "name" => displayName || name,
+        "nickname" => preferred_username || name,
+        "name" => display_name || name,
         "host" => URI.parse(uri).host,
         "avatar" => avatar
       }}

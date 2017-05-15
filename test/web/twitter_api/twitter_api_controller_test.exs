@@ -7,6 +7,8 @@ defmodule Pleroma.Web.TwitterAPI.ControllerTest do
 
   import Pleroma.Factory
 
+  # TODO: separate into individual controller tests
+
   describe "POST /api/account/verify_credentials" do
     setup [:valid_user]
     test "without valid credentials", %{conn: conn} do
