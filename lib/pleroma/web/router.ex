@@ -57,8 +57,8 @@ defmodule Pleroma.Web.Router do
     post "/friendships/create", TwitterAPI.UserController, :follow
     post "/friendships/destroy", TwitterAPI.UserController, :unfollow
 
-    post "/statusnet/media/upload", TwitterAPI.Controller, :upload
-    post "/media/upload", TwitterAPI.Controller, :upload_json
+    post "/statusnet/media/upload", TwitterAPI.MediaController, :upload
+    post "/media/upload", TwitterAPI.MediaController, :upload_json
 
     post "/favorites/create/:id", TwitterAPI.StatusController, :favorite
     post "/favorites/create", TwitterAPI.StatusController, :favorite

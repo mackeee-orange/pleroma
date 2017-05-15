@@ -7,7 +7,7 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
   import Pleroma.Factory
 
   test "create a status" do
-    user = UserBuilder.build(%{ap_id: "142344"})
+    %User{ap_id: user_ap_id} = user = UserBuilder.build(%{ap_id: "142344"})
     _mentioned_user = UserBuilder.insert(%{nickname: "shp", ap_id: "shp"})
 
     object_data = %{
@@ -22,31 +22,34 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
       "uuid" => 1
     }
 
-    object = Repo.insert!(%Object{data: object_data})
+    %Object{id: object_id} = Repo.insert!(%Object{data: object_data})
 
     input = %{
       "status" => "Hello again, @shp.<script></script>\nThis is on another line.",
-      "media_ids" => [object.id]
+      "media_ids" => [object_id]
     }
+    {:ok, %Activity{local: true, data: %{
+      "context" => context, "to" => to, "actor" => actor, "object" => object = %{
+        "id" => ap_id, "content" => content, "type" => "Note", "actor" => obj_actor,
+        "context" => obj_context, "attachment" => attachment
+      }
+    }}} = TwitterAPI.create_status(user, input)
 
-    { :ok, activity = %Activity{} } = TwitterAPI.create_status(user, input)
+    assert content == "Hello again, <a href='shp'>@shp</a>.<br>This is on another line.<br><a href='http://example.org/image.jpg' class='attachment'>http://example.org/image.jpg</a>"
 
-    assert get_in(activity.data, ["object", "content"]) == "Hello again, <a href='shp'>@shp</a>.<br>This is on another line.<br><a href='http://example.org/image.jpg' class='attachment'>http://example.org/image.jpg</a>"
-    assert get_in(activity.data, ["object", "type"]) == "Note"
-    assert get_in(activity.data, ["object", "actor"]) == user.ap_id
-    assert get_in(activity.data, ["actor"]) == user.ap_id
-    assert Enum.member?(get_in(activity.data, ["to"]), User.ap_followers(user))
-    assert Enum.member?(get_in(activity.data, ["to"]), "https://www.w3.org/ns/activitystreams#Public")
-    assert Enum.member?(get_in(activity.data, ["to"]), "shp")
-    assert activity.local == true
+    assert user_ap_id == actor
+    assert user_ap_id == obj_actor
 
-    # Add a context
-    assert is_binary(get_in(activity.data, ["context"]))
-    assert is_binary(get_in(activity.data, ["object", "context"]))
+    assert is_binary(context)
+    assert is_binary(obj_context)
 
-    assert is_list(activity.data["object"]["attachment"])
+    assert Enum.member?(to, User.ap_followers(user))
+    assert Enum.member?(to, "https://www.w3.org/ns/activitystreams#Public")
+    assert Enum.member?(to, "shp")
 
-    assert activity.data["object"] == Object.get_by_ap_id(activity.data["object"]["id"]).data
+    assert is_list(attachment)
+
+    assert object == Object.get_by_ap_id(ap_id).data
   end
 
   test "create a status that is a reply" do
@@ -55,28 +58,20 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
       "status" => "Hello again."
     }
 
-    { :ok, activity = %Activity{} } = TwitterAPI.create_status(user, input)
+    {:ok, activity = %Activity{id: id}} = TwitterAPI.create_status(user, input)
 
     input = %{
       "status" => "Here's your (you).",
-      "in_reply_to_status_id" => activity.id
+      "in_reply_to_status_id" => id
     }
 
-    { :ok, reply = %Activity{} } = TwitterAPI.create_status(user, input)
+    {:ok, reply = %Activity{}} = TwitterAPI.create_status(user, input)
 
     assert get_in(reply.data, ["context"]) == get_in(activity.data, ["context"])
     assert get_in(reply.data, ["object", "context"]) == get_in(activity.data, ["object", "context"])
     assert get_in(reply.data, ["object", "inReplyTo"]) == get_in(activity.data, ["object", "id"])
     assert get_in(reply.data, ["object", "inReplyToStatusId"]) == activity.id
     assert Enum.member?(get_in(reply.data, ["to"]), "some_cool_id")
-  end
-
-  test "upload a file" do
-    file = %Plug.Upload{content_type: "image/jpg", path: Path.absname("test/fixtures/image.jpg"), filename: "an_image.jpg"}
-
-    response = TwitterAPI.upload(file)
-
-    assert is_binary(response)
   end
 
   test "it can parse mentions and return the relevant users" do
