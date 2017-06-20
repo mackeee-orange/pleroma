@@ -1,13 +1,8 @@
 defmodule Pleroma.Web.TwitterAPI.Controller do
   use Pleroma.Web, :controller
-  alias Pleroma.Web.TwitterAPI.{ErrorView, StatusView, TwitterAPI, UserView}
-  alias Pleroma.{Web, Repo, Activity}
+  alias Pleroma.Web.TwitterAPI.{ErrorView, StatusView, TwitterAPI}
+  alias Pleroma.{Web, Repo, Activity, User}
   alias Pleroma.Web.ActivityPub.ActivityPub
-  alias Ecto.Changeset
-
-  def verify_credentials(%{assigns: %{user: user}} = conn, _params) do
-    render(conn, UserView, "show.json", %{user: user})
-  end
 
   def status_update(%{assigns: %{user: user}} = conn, %{"status" => status_text} = status_data) do
     l = status_text |> String.trim |> String.length
@@ -25,7 +20,9 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
   end
 
   defp empty_status_reply(conn) do
-    bad_request_reply(conn, "Client must provide a 'status' parameter with a value.")
+    conn
+    |> put_status(:bad_request)
+    |> render(ErrorView, "error.json", %{request_path: conn.request_path, message: "Client must provide a 'status' parameter with a value."})
   end
 
   defp extract_media_ids(status_data) do
@@ -55,35 +52,21 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
   end
 
   def user_timeline(%{assigns: %{user: user}} = conn, params) do
-    case TwitterAPI.get_user(user, params) do
+    case User.get_by_params(user, params) do
       {:ok, target_user} ->
         params = Map.merge(params, %{"actor_id" => target_user.ap_id})
         activities = ActivityPub.fetch_activities([], params)
         render(conn, StatusView, "timeline.json", %{activities: activities, for: user})
-      {:error, msg} ->
-        bad_request_reply(conn, msg)
+      {status, msg} ->
+        conn
+        |> put_status(status)
+        |> render(ErrorView, "error.json", %{request_path: conn.request_path, message: msg})
     end
   end
 
   def mentions_timeline(%{assigns: %{user: user}} = conn, params) do
     activities = ActivityPub.fetch_activities([user.ap_id], params)
     render(conn, StatusView, "timeline.json", %{activities: activities, for: user})
-  end
-
-  def follow(%{assigns: %{user: user}} = conn, params) do
-    case TwitterAPI.follow(user, params) do
-      {:ok, user, followed, _activity} ->
-        render(conn, UserView, "show.json", %{user: followed, for: user})
-      {:error, msg} -> forbidden_reply(conn, msg)
-    end
-  end
-
-  def unfollow(%{assigns: %{user: user}} = conn, params) do
-    case TwitterAPI.unfollow(user, params) do
-      {:ok, user, unfollowed} ->
-        render(conn, UserView, "show.json", %{user: unfollowed, for: user})
-      {:error, msg} -> forbidden_reply(conn, msg)
-    end
   end
 
   def fetch_status(%{assigns: %{user: user}} = conn, %{"id" => id}) do
@@ -143,49 +126,13 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
   def retweet(%{assigns: %{user: user}} = conn, %{"id" => id}) do
     activity = Repo.get(Activity, id)
     if activity.data["actor"] == user.ap_id do
-      bad_request_reply(conn, "You cannot repeat your own notice.")
+      conn
+      |> put_status(:bad_request)
+      |> render(ErrorView, "error.json", %{request_path: conn.request_path, message: "You cannot repeat your own notice."})
     else
       {:ok, activity} = TwitterAPI.retweet(user, activity)
       render(conn, StatusView, "show.json", %{activity: activity, for: user})
     end
   end
 
-  def register(conn, params) do
-    with {:ok, user} <- TwitterAPI.register_user(params) do
-      render(conn, UserView, "show.json", %{user: user})
-    else
-      {:error, errors} ->
-        bad_request_reply(conn, Poison.encode!(errors))
-    end
-  end
-
-  def update_avatar(%{assigns: %{user: user}} = conn, params) do
-    {:ok, object} = ActivityPub.upload(params)
-    change = Changeset.change(user, %{avatar: object.data})
-    {:ok, user} = Repo.update(change)
-
-    render(conn, UserView, "show.json", %{user: user, for: user})
-  end
-
-  def external_profile(%{assigns: %{user: current_user}} = conn, %{"profileurl" => uri}) do
-    with {:ok, user_map} <- TwitterAPI.get_external_profile(current_user, uri) do
-      json(conn, user_map)
-    end
-  end
-
-  defp bad_request_reply(conn, message) do
-    conn
-    |> put_status(:bad_request)
-    |> render_error(message)
-  end
-
-  defp forbidden_reply(conn, message) do
-    conn
-    |> put_status(:forbidden)
-    |> render_error(message)
-  end
-
-  defp render_error(conn, message) do
-    render(conn, ErrorView, "error.json", %{request_path: conn.request_path, message: message})
-  end
 end

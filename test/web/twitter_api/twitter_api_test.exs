@@ -1,7 +1,7 @@
 defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
   use Pleroma.DataCase
   alias Pleroma.Builders.{UserBuilder}
-  alias Pleroma.Web.TwitterAPI.{StatusView, TwitterAPI, UserView, Utils}
+  alias Pleroma.Web.TwitterAPI.{StatusView, TwitterAPI, Utils}
   alias Pleroma.{Activity, User, Object, Repo}
   alias Pleroma.Web.ActivityPub.ActivityPub
 
@@ -75,68 +75,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     assert Enum.member?(get_in(reply.data, ["to"]), "some_cool_id")
   end
 
-  test "get a user by params" do
-    user1_result = {:ok, user1} = UserBuilder.insert(%{ap_id: "some id", email: "test@pleroma"})
-    {:ok, user2} = UserBuilder.insert(%{ap_id: "some other id", nickname: "testname2", email: "test2@pleroma"})
-
-    assert {:error, "You need to specify screen_name or user_id"} == TwitterAPI.get_user(nil, nil)
-    assert user1_result == TwitterAPI.get_user(nil, %{"user_id" => user1.id})
-    assert user1_result == TwitterAPI.get_user(nil, %{"user_id" => user1.nickname})
-    assert user1_result == TwitterAPI.get_user(nil, %{"screen_name" => user1.nickname})
-    assert user1_result == TwitterAPI.get_user(user1, nil)
-    assert user1_result == TwitterAPI.get_user(user2, %{"user_id" => user1.id})
-    assert user1_result == TwitterAPI.get_user(user2, %{"screen_name" => user1.nickname})
-    assert {:error, "No user with such screen_name"} == TwitterAPI.get_user(nil, %{"screen_name" => "Satan"})
-    assert {:error, "No user with such user_id"} == TwitterAPI.get_user(nil, %{"user_id" => 666})
-  end
-
-  test "Follow another user using user_id" do
-    user = insert(:user)
-    followed = insert(:user)
-
-    {:ok, user, followed, _activity } = TwitterAPI.follow(user, %{"user_id" => followed.id})
-    assert user.following == [User.ap_followers(followed)]
-
-    { :error, msg } = TwitterAPI.follow(user, %{"user_id" => followed.id})
-    assert msg == "Could not follow user: #{followed.nickname} is already on your list."
-  end
-
-  test "Follow another user using screen_name" do
-    user = insert(:user)
-    followed = insert(:user)
-
-    {:ok, user, followed, _activity } = TwitterAPI.follow(user, %{"screen_name" => followed.nickname})
-    assert user.following == [User.ap_followers(followed)]
-
-    { :error, msg } = TwitterAPI.follow(user, %{"screen_name" => followed.nickname})
-    assert msg == "Could not follow user: #{followed.nickname} is already on your list."
-  end
-
-  test "Unfollow another user using user_id" do
-    unfollowed = insert(:user)
-    user = insert(:user, %{following: [User.ap_followers(unfollowed)]})
-    ActivityPub.follow(user, unfollowed)
-
-    {:ok, user, unfollowed } = TwitterAPI.unfollow(user, %{"user_id" => unfollowed.id})
-    assert user.following == []
-
-    { :error, msg } = TwitterAPI.unfollow(user, %{"user_id" => unfollowed.id})
-    assert msg == "Not subscribed!"
-  end
-
-  test "Unfollow another user using screen_name" do
-    unfollowed = insert(:user)
-    user = insert(:user, %{following: [User.ap_followers(unfollowed)]})
-
-    ActivityPub.follow(user, unfollowed)
-
-    {:ok, user, unfollowed } = TwitterAPI.unfollow(user, %{"screen_name" => unfollowed.nickname})
-    assert user.following == []
-
-    { :error, msg } = TwitterAPI.unfollow(user, %{"screen_name" => unfollowed.nickname})
-    assert msg == "Not subscribed!"
-  end
-
   test "upload a file" do
     file = %Plug.Upload{content_type: "image/jpg", path: Path.absname("test/fixtures/image.jpg"), filename: "an_image.jpg"}
 
@@ -191,37 +129,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     assert StatusView.render("show.json", %{activity: status}) == StatusView.render("show.json", %{activity: updated_activity}) # FIXME: was complaining about microseconds
   end
 
-  test "it registers a new user and returns the user." do
-    data = %{
-      "nickname" => "lain",
-      "email" => "lain@wired.jp",
-      "fullname" => "lain iwakura",
-      "bio" => "close the world.",
-      "password" => "bear",
-      "confirm" => "bear"
-    }
-
-    {:ok, user} = TwitterAPI.register_user(data)
-
-    fetched_user = Repo.get_by(User, nickname: "lain")
-    assert UserView.render("show.json", %{user: user}) == UserView.render("show.json", %{user: fetched_user})
-  end
-
-  test "it returns the error on registration problems" do
-    data = %{
-      "nickname" => "lain",
-      "email" => "lain@wired.jp",
-      "fullname" => "lain iwakura",
-      "bio" => "close the world.",
-      "password" => "bear"
-    }
-
-    {:error, error_object} = TwitterAPI.register_user(data)
-
-    assert is_binary(error_object[:error])
-    refute Repo.get_by(User, nickname: "lain")
-  end
-
   test "it assigns an integer conversation_id" do
     note_activity = insert(:note_activity)
     assert is_number(StatusView.conversation_id(note_activity))
@@ -246,20 +153,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
       conversation_id = TwitterAPI.context_to_conversation_id("random context")
 
       assert conversation_id == object.id
-    end
-  end
-
-  describe "fetching a user by uri" do
-    test "fetches a user by uri" do
-      id = "https://mastodon.social/users/lambadalambda"
-      user = insert(:user)
-      {:ok, represented} = TwitterAPI.get_external_profile(user, id)
-      remote = User.get_by_ap_id(id)
-
-      assert represented == UserView.render("show.json", %{user: remote, for: user})
-
-      # Also fetches the feed.
-      assert Activity.get_create_activity_by_object_ap_id("tag:mastodon.social,2017-04-05:objectId=1641750:objectType=Status")
     end
   end
 end

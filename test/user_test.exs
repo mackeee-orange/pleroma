@@ -9,11 +9,6 @@ defmodule Pleroma.UserTest do
   import Ecto.Query
 
   test "ap_id returns the activity pub id for the user" do
-    host =
-      Application.get_env(:pleroma, Pleroma.Web.Endpoint)
-      |> Keyword.fetch!(:url)
-      |> Keyword.fetch!(:host)
-
     user = UserBuilder.build
 
     expected_ap_id = "#{Pleroma.Web.base_url}/users/#{user.nickname}"
@@ -190,5 +185,19 @@ defmodule Pleroma.UserTest do
       end)
     end
   end
-end
 
+  test "get a user by params" do
+    user1 = insert(:user)
+    user2 = insert(:user)
+    user1_result = {:ok, user1}
+
+    assert {:bad_request, "You need to specify screen_name or user_id"} == User.get_by_params(nil, nil)
+    assert user1_result == User.get_by_params(nil, %{"user_id" => user1.id})
+    assert user1_result == User.get_by_params(nil, %{"screen_name" => user1.nickname})
+    assert user1_result == User.get_by_params(user1, nil)
+    assert user1_result == User.get_by_params(user2, %{"user_id" => user1.id})
+    assert user1_result == User.get_by_params(user2, %{"screen_name" => user1.nickname})
+    assert {:not_found, "No user with such screen_name"} == User.get_by_params(nil, %{"screen_name" => "Satan"})
+    assert {:not_found, "No user with such user_id"} == User.get_by_params(nil, %{"user_id" => 666})
+  end
+end

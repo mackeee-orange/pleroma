@@ -38,16 +38,16 @@ defmodule Pleroma.Web.Router do
     get "/statuses/show/:id", TwitterAPI.Controller, :fetch_status
     get "/statusnet/conversation/:id", TwitterAPI.Controller, :fetch_conversation
 
-    post "/account/register", TwitterAPI.Controller, :register
+    post "/account/register", TwitterAPI.UserController, :register
 
-    get "/externalprofile/show", TwitterAPI.Controller, :external_profile
+    get "/externalprofile/show", TwitterAPI.UserController, :external_profile
   end
 
   scope "/api", Pleroma.Web do
     pipe_through :authenticated_api
 
-    get "/account/verify_credentials", TwitterAPI.Controller, :verify_credentials
-    post "/account/verify_credentials", TwitterAPI.Controller, :verify_credentials
+    get "/account/verify_credentials", TwitterAPI.UserController, :verify_credentials
+    post "/account/verify_credentials", TwitterAPI.UserController, :verify_credentials
 
     get "/statuses/home_timeline", TwitterAPI.Controller, :friends_timeline
     get "/statuses/friends_timeline", TwitterAPI.Controller, :friends_timeline
@@ -57,8 +57,8 @@ defmodule Pleroma.Web.Router do
     post "/statuses/update", TwitterAPI.Controller, :status_update
     post "/statuses/retweet/:id", TwitterAPI.Controller, :retweet
 
-    post "/friendships/create", TwitterAPI.Controller, :follow
-    post "/friendships/destroy", TwitterAPI.Controller, :unfollow
+    post "/friendships/create", TwitterAPI.UserController, :follow
+    post "/friendships/destroy", TwitterAPI.UserController, :unfollow
 
     post "/statusnet/media/upload", TwitterAPI.Controller, :upload
     post "/media/upload", TwitterAPI.Controller, :upload_json
@@ -67,7 +67,7 @@ defmodule Pleroma.Web.Router do
     post "/favorites/create", TwitterAPI.Controller, :favorite
     post "/favorites/destroy/:id", TwitterAPI.Controller, :unfavorite
 
-    post "/qvitter/update_avatar", TwitterAPI.Controller, :update_avatar
+    post "/qvitter/update_avatar", TwitterAPI.UserController, :update_avatar
   end
 
   pipeline :ostatus do
