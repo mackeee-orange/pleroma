@@ -1,8 +1,7 @@
 defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
   alias Pleroma.{User, Activity, Repo, Object}
   alias Pleroma.Web.ActivityPub.ActivityPub
-  alias Pleroma.Web.TwitterAPI.Representers.ActivityRepresenter
-  alias Pleroma.Web.TwitterAPI.UserView
+  alias Pleroma.Web.TwitterAPI.{UserView, Utils}
   alias Pleroma.Web.OStatus
   alias Pleroma.Formatter
 
@@ -43,49 +42,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     end
   end
 
-  def fetch_friend_statuses(user, opts \\ %{}) do
-    ActivityPub.fetch_activities([user.ap_id | user.following], opts)
-    |> activities_to_statuses(%{for: user})
-  end
-
-  def fetch_public_statuses(user, opts \\ %{}) do
-    opts = Map.put(opts, "local_only", true)
-    ActivityPub.fetch_public_activities(opts)
-    |> activities_to_statuses(%{for: user})
-  end
-
-  def fetch_public_and_external_statuses(user, opts \\ %{}) do
-    ActivityPub.fetch_public_activities(opts)
-    |> activities_to_statuses(%{for: user})
-  end
-
-  def fetch_user_statuses(user, opts \\ %{}) do
-    ActivityPub.fetch_activities([], opts)
-    |> activities_to_statuses(%{for: user})
-  end
-
-  def fetch_mentions(user, opts \\ %{}) do
-    ActivityPub.fetch_activities([user.ap_id], opts)
-    |> activities_to_statuses(%{for: user})
-  end
-
-  def fetch_conversation(user, id) do
-    with context when is_binary(context) <- conversation_id_to_context(id),
-         activities <- ActivityPub.fetch_activities_for_context(context),
-         statuses <- activities |> activities_to_statuses(%{for: user})
-    do
-      statuses
-    else _e ->
-      []
-    end
-  end
-
-  def fetch_status(user, id) do
-    with %Activity{} = activity <- Repo.get(Activity, id) do
-      activity_to_status(activity, %{for: user})
-    end
-  end
-
   def follow(%User{} = follower, params) do
     with {:ok, %User{} = followed} <- get_user(params),
          {:ok, follower} <- User.follow(follower, followed),
@@ -104,7 +60,7 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
            "type" => "Undo",
            "actor" => follower.ap_id,
            "object" => follow_activity.data["id"], # get latest Follow for these users
-           "published" => make_date()
+           "published" => Utils.make_date()
          })
     do
       { :ok, follower, unfollowed }
@@ -121,8 +77,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     |> Map.put("object", object.data)
 
     status = %{activity | data: new_data}
-    |> activity_to_status(%{for: user})
-
     {:ok, status}
   end
 
@@ -134,8 +88,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     |> Map.put("object", object.data)
 
     status = %{activity | data: new_data}
-    |> activity_to_status(%{for: user})
-
     {:ok, status}
   end
 
@@ -147,8 +99,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
     |> Map.put("object", object.data)
 
     status = %{activity | data: new_data}
-    |> activity_to_status(%{for: user})
-
     {:ok, status}
   end
 
@@ -236,47 +186,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
           {:error, "You need to specify screen_name or user_id"}
         end
     end
-  end
-
-  defp activities_to_statuses(activities, opts) do
-    Enum.map(activities, fn(activity) ->
-      activity_to_status(activity, opts)
-    end)
-  end
-
-  # For likes, fetch the liked activity, too.
-  defp activity_to_status(%Activity{data: %{"type" => "Like"}} = activity, opts) do
-    actor = get_in(activity.data, ["actor"])
-    user = User.get_cached_by_ap_id(actor)
-    [liked_activity] = Activity.all_by_object_ap_id(activity.data["object"])
-
-    ActivityRepresenter.to_map(activity, Map.merge(opts, %{user: user, liked_activity: liked_activity}))
-  end
-
-  # For announces, fetch the announced activity and the user.
-  defp activity_to_status(%Activity{data: %{"type" => "Announce"}} = activity, opts) do
-    actor = get_in(activity.data, ["actor"])
-    user = User.get_cached_by_ap_id(actor)
-    [announced_activity] = Activity.all_by_object_ap_id(activity.data["object"])
-    announced_actor = User.get_cached_by_ap_id(announced_activity.data["actor"])
-
-    ActivityRepresenter.to_map(activity, Map.merge(opts, %{users: [user, announced_actor], announced_activity: announced_activity}))
-  end
-
-  defp activity_to_status(activity, opts) do
-    actor = get_in(activity.data, ["actor"])
-    user = User.get_cached_by_ap_id(actor)
-    # mentioned_users = Repo.all(from user in User, where: user.ap_id in ^activity.data["to"])
-    mentioned_users = Enum.map(activity.data["to"] || [], fn (ap_id) ->
-      User.get_cached_by_ap_id(ap_id)
-    end)
-    |> Enum.filter(&(&1))
-
-    ActivityRepresenter.to_map(activity, Map.merge(opts, %{user: user, mentioned: mentioned_users}))
-  end
-
-  defp make_date do
-    DateTime.utc_now() |> DateTime.to_iso8601
   end
 
   def context_to_conversation_id(context) do

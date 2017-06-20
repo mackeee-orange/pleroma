@@ -1,8 +1,8 @@
-defmodule Pleroma.Web.TwitterAPI.Representers.ObjectReprenterTest do
+defmodule Pleroma.Web.TwitterAPI.AttachmentViewTest do
   use Pleroma.DataCase
 
   alias Pleroma.Object
-  alias Pleroma.Web.TwitterAPI.Representers.ObjectRepresenter
+  alias Pleroma.Web.TwitterAPI.AttachmentView
 
   test "represent an image attachment" do
     object = %Object{
@@ -26,6 +26,6 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ObjectReprenterTest do
       oembed: false
     }
 
-    assert expected_object == ObjectRepresenter.to_map(object)
+    assert expected_object == AttachmentView.render("show.json", %{attachment: object})
   end
 end

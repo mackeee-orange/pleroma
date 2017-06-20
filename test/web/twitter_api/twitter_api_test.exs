@@ -1,9 +1,8 @@
 defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
   use Pleroma.DataCase
-  alias Pleroma.Builders.{UserBuilder, ActivityBuilder}
-  alias Pleroma.Web.TwitterAPI.{TwitterAPI,UserView,Utils}
+  alias Pleroma.Builders.{UserBuilder}
+  alias Pleroma.Web.TwitterAPI.{StatusView, TwitterAPI, UserView, Utils}
   alias Pleroma.{Activity, User, Object, Repo}
-  alias Pleroma.Web.TwitterAPI.Representers.ActivityRepresenter
   alias Pleroma.Web.ActivityPub.ActivityPub
 
   import Pleroma.Factory
@@ -76,56 +75,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     assert Enum.member?(get_in(reply.data, ["to"]), "some_cool_id")
   end
 
-  test "fetch public statuses, excluding remote ones." do
-    %{ public: activity, user: user } = ActivityBuilder.public_and_non_public
-    insert(:note_activity, %{local: false})
-
-    follower = insert(:user, following: [User.ap_followers(user)])
-
-    statuses = TwitterAPI.fetch_public_statuses(follower)
-
-    assert length(statuses) == 1
-    assert Enum.at(statuses, 0) == ActivityRepresenter.to_map(activity, %{user: user, for: follower})
-  end
-
-  test "fetch whole known network statuses" do
-    %{ public: activity, user: user } = ActivityBuilder.public_and_non_public
-    insert(:note_activity, %{local: false})
-
-    follower = insert(:user, following: [User.ap_followers(user)])
-
-    statuses = TwitterAPI.fetch_public_and_external_statuses(follower)
-
-    assert length(statuses) == 2
-    assert Enum.at(statuses, 0) == ActivityRepresenter.to_map(activity, %{user: user, for: follower})
-  end
-
-  test "fetch friends' statuses" do
-    user = insert(:user, %{following: ["someguy/followers"]})
-    {:ok, activity} = ActivityBuilder.insert(%{"to" => ["someguy/followers"]})
-    {:ok, direct_activity} = ActivityBuilder.insert(%{"to" => [user.ap_id]})
-
-    statuses = TwitterAPI.fetch_friend_statuses(user)
-
-    activity_user = Repo.get_by(User, ap_id: activity.data["actor"])
-    direct_activity_user = Repo.get_by(User, ap_id: direct_activity.data["actor"])
-
-    assert length(statuses) == 2
-    assert Enum.at(statuses, 0) == ActivityRepresenter.to_map(activity, %{user: activity_user})
-    assert Enum.at(statuses, 1) == ActivityRepresenter.to_map(direct_activity, %{user: direct_activity_user, mentioned: [user]})
-  end
-
-  test "fetch user's mentions" do
-    user = insert(:user)
-    {:ok, activity} = ActivityBuilder.insert(%{"to" => [user.ap_id]})
-    activity_user = Repo.get_by(User, ap_id: activity.data["actor"])
-
-    statuses = TwitterAPI.fetch_mentions(user)
-
-    assert length(statuses) == 1
-    assert Enum.at(statuses, 0) == ActivityRepresenter.to_map(activity, %{user: activity_user, mentioned: [user]})
-  end
-
   test "get a user by params" do
     user1_result = {:ok, user1} = UserBuilder.insert(%{ap_id: "some id", email: "test@pleroma"})
     {:ok, user2} = UserBuilder.insert(%{ap_id: "some other id", nickname: "testname2", email: "test2@pleroma"})
@@ -139,34 +88,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     assert user1_result == TwitterAPI.get_user(user2, %{"screen_name" => user1.nickname})
     assert {:error, "No user with such screen_name"} == TwitterAPI.get_user(nil, %{"screen_name" => "Satan"})
     assert {:error, "No user with such user_id"} == TwitterAPI.get_user(nil, %{"user_id" => 666})
-  end
-
-  test "fetch user's statuses" do
-    {:ok, user1} = UserBuilder.insert(%{ap_id: "some id", email: "test@pleroma"})
-    {:ok, user2} = UserBuilder.insert(%{ap_id: "some other id", nickname: "testname2", email: "test2@pleroma"})
-
-    {:ok, status1} = ActivityBuilder.insert(%{"id" => 1}, %{user: user1})
-    {:ok, status2} = ActivityBuilder.insert(%{"id" => 2}, %{user: user2})
-
-    user1_statuses = TwitterAPI.fetch_user_statuses(user1, %{"actor_id" => user1.ap_id})
-
-    assert length(user1_statuses) == 1
-    assert Enum.at(user1_statuses, 0) == ActivityRepresenter.to_map(status1, %{user: user1})
-
-    user2_statuses = TwitterAPI.fetch_user_statuses(user1, %{"actor_id" => user2.ap_id})
-
-    assert length(user2_statuses) == 1
-    assert Enum.at(user2_statuses, 0) == ActivityRepresenter.to_map(status2, %{user: user2})
-  end
-
-  test "fetch a single status" do
-    {:ok, activity} = ActivityBuilder.insert()
-    {:ok, user} = UserBuilder.insert()
-    actor = Repo.get_by!(User, ap_id: activity.data["actor"])
-
-    status = TwitterAPI.fetch_status(user, activity.id)
-
-    assert status == ActivityRepresenter.to_map(activity, %{for: user, user: actor})
   end
 
   test "Follow another user using user_id" do
@@ -216,21 +137,6 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
     assert msg == "Not subscribed!"
   end
 
-  test "fetch statuses in a context using the conversation id" do
-    {:ok, user} = UserBuilder.insert()
-    {:ok, activity} = ActivityBuilder.insert(%{"context" => "2hu"})
-    {:ok, activity_two} = ActivityBuilder.insert(%{"context" => "2hu"})
-    {:ok, _activity_three} = ActivityBuilder.insert(%{"context" => "3hu"})
-
-    {:ok, object} = Object.context_mapping("2hu") |> Repo.insert
-
-    statuses = TwitterAPI.fetch_conversation(user, object.id)
-
-    assert length(statuses) == 2
-    assert Enum.at(statuses, 0)["id"] == activity.id
-    assert Enum.at(statuses, 1)["id"] == activity_two.id
-  end
-
   test "upload a file" do
     file = %Plug.Upload{content_type: "image/jpg", path: Path.absname("test/fixtures/image.jpg"), filename: "an_image.jpg"}
 
@@ -255,38 +161,34 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
   test "it favorites a status, returns the updated status" do
     user = insert(:user)
     note_activity = insert(:note_activity)
-    activity_user = Repo.get_by!(User, ap_id: note_activity.data["actor"])
 
     {:ok, status} = TwitterAPI.favorite(user, note_activity)
     updated_activity = Activity.get_by_ap_id(note_activity.data["id"])
 
-    assert status == ActivityRepresenter.to_map(updated_activity, %{user: activity_user, for: user})
+    assert StatusView.render("show.json", %{activity: status}) == StatusView.render("show.json", %{activity: updated_activity}) # FIXME: was complaining about microseconds
   end
 
   test "it unfavorites a status, returns the updated status" do
     user = insert(:user)
     note_activity = insert(:note_activity)
-    activity_user = Repo.get_by!(User, ap_id: note_activity.data["actor"])
     object = Object.get_by_ap_id(note_activity.data["object"]["id"])
 
     {:ok, _like_activity, _object } = ActivityPub.like(user, object)
-    updated_activity = Activity.get_by_ap_id(note_activity.data["id"])
-    assert ActivityRepresenter.to_map(updated_activity, %{user: activity_user, for: user})["fave_num"] == 1
+    %Activity{data: %{"object" => object}} = Activity.get_by_ap_id(note_activity.data["id"])
+    assert object["like_count"] == 1
 
-    {:ok, status} = TwitterAPI.unfavorite(user, note_activity)
+    {:ok, %Activity{data: %{"object" => object}}} = TwitterAPI.unfavorite(user, note_activity)
 
-    assert status["fave_num"] == 0
+    assert object["like_count"] == 0
   end
 
   test "it retweets a status and returns the retweet" do
     user = insert(:user)
     note_activity = insert(:note_activity)
-    activity_user = Repo.get_by!(User, ap_id: note_activity.data["actor"])
 
     {:ok, status} = TwitterAPI.retweet(user, note_activity)
     updated_activity = Activity.get_by_ap_id(note_activity.data["id"])
-
-    assert status == ActivityRepresenter.to_map(updated_activity, %{user: activity_user, for: user})
+    assert StatusView.render("show.json", %{activity: status}) == StatusView.render("show.json", %{activity: updated_activity}) # FIXME: was complaining about microseconds
   end
 
   test "it registers a new user and returns the user." do
@@ -322,10 +224,7 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPITest do
 
   test "it assigns an integer conversation_id" do
     note_activity = insert(:note_activity)
-    user = User.get_cached_by_ap_id(note_activity.data["actor"])
-    status = ActivityRepresenter.to_map(note_activity, %{user: user})
-
-    assert is_number(status["statusnet_conversation_id"])
+    assert is_number(StatusView.conversation_id(note_activity))
   end
 
   setup do

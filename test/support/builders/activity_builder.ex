@@ -11,7 +11,8 @@ defmodule Pleroma.Builders.ActivityBuilder do
       "object" => %{
         "type" => "Note",
         "content" => "test"
-      }
+      },
+      "type" => "Create"
     }
     Map.merge(activity, data)
   end

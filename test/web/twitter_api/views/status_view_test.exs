@@ -1,27 +1,25 @@
-defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
+defmodule Pleroma.Web.TwitterAPI.StatusViewTest do
   use Pleroma.DataCase
   alias Pleroma.{User, Activity, Object}
-  alias Pleroma.Web.TwitterAPI.Representers.{ActivityRepresenter, ObjectRepresenter}
+  alias Pleroma.Web.TwitterAPI.{AttachmentView, UserView, StatusView}
   alias Pleroma.Web.ActivityPub.ActivityPub
-  alias Pleroma.Builders.UserBuilder
-  alias Pleroma.Web.TwitterAPI.UserView
   import Pleroma.Factory
 
   test "an announce activity" do
     user = insert(:user)
-    note_activity = insert(:note_activity)
-    activity_actor = Repo.get_by(User, ap_id: note_activity.data["actor"])
-    object = Object.get_by_ap_id(note_activity.data["object"]["id"])
+    %Activity{data: %{"id" => note_ap_id, "object" => %{"id" => object_id}}} = insert(:note_activity)
+    object = Object.get_by_ap_id(object_id)
 
-    {:ok, announce_activity, _object} = ActivityPub.announce(user, object)
-    note_activity = Activity.get_by_ap_id(note_activity.data["id"])
+    {:ok,
+     announce_activity = %Activity{id: announce_id, data: %{"type" => "Announce"}},
+     _object} = ActivityPub.announce(user, object)
 
-    status = ActivityRepresenter.to_map(announce_activity, %{users: [user, activity_actor], announced_activity: note_activity, for: user})
-
-    assert status["id"] == announce_activity.id
+    status = StatusView.render("show.json", %{activity: announce_activity, for: user})
+    assert status["id"] == announce_id
     assert status["user"] == UserView.render("show.json", %{user: user, for: user})
 
-    retweeted_status = ActivityRepresenter.to_map(note_activity, %{user: activity_actor, for: user})
+    note_activity = Activity.get_by_ap_id(note_ap_id)
+    retweeted_status = StatusView.render("show.json", %{activity: note_activity, for: user})
     assert retweeted_status["repeated"] == true
     assert retweeted_status["id"] == note_activity.id
     assert status["statusnet_conversation_id"] == retweeted_status["statusnet_conversation_id"]
@@ -31,23 +29,22 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
 
   test "a like activity" do
     user = insert(:user)
-    note_activity = insert(:note_activity)
-    object = Object.get_by_ap_id(note_activity.data["object"]["id"])
+    %Activity{id: note_id, data: %{"id" => note_ap_id, "object" => %{"id" => object_id}}} = insert(:note_activity)
+    object = Object.get_by_ap_id(object_id)
 
-    {:ok, like_activity, _object} = ActivityPub.like(user, object)
-    status = ActivityRepresenter.to_map(like_activity, %{user: user, liked_activity: note_activity})
+    {:ok, like_activity = %Activity{id: like_id, data: %{"type" => "Like"}}, _object} = ActivityPub.like(user, object)
+    status = StatusView.render("show.json", %{activity: like_activity})
 
-    assert status["id"] == like_activity.id
-    assert status["in_reply_to_status_id"] == note_activity.id
+    assert status["id"] == like_id
+    assert status["in_reply_to_status_id"] == note_id
 
-    note_activity = Activity.get_by_ap_id(note_activity.data["id"])
-    activity_actor = Repo.get_by(User, ap_id: note_activity.data["actor"])
-    liked_status = ActivityRepresenter.to_map(note_activity, %{user: activity_actor, for: user})
+    note_activity = Activity.get_by_ap_id(note_ap_id)
+    liked_status = StatusView.render("show.json", %{activity: note_activity, for: user})
     assert liked_status["favorited"] == true
   end
 
   test "an activity" do
-    {:ok, user} = UserBuilder.insert
+    user = insert(:user, %{nickname: "dtluna"})
     #   {:ok, mentioned_user } = UserBuilder.insert(%{nickname: "shp", ap_id: "shp"})
     mentioned_user = insert(:user, %{nickname: "shp"})
 
@@ -68,7 +65,7 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
       }
     }
 
-    content_html = "<script>alert('YAY')</script>Some content mentioning <a href='#{mentioned_user.ap_id}'>@shp</shp>"
+    content_html = "Some content mentioning <a href='#{mentioned_user.ap_id}'>@shp</shp>"
     content = HtmlSanitizeEx.strip_tags(content_html)
     date = DateTime.from_naive!(~N[2016-05-24 13:26:08.003], "Etc/UTC") |> DateTime.to_iso8601
 
@@ -84,7 +81,7 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
           "https://www.w3.org/ns/activitystreams#Public",
           mentioned_user.ap_id
         ],
-        "actor" => User.ap_id(user),
+        "actor" => user.ap_id,
         "object" => %{
           "published" => date,
           "type" => "Note",
@@ -95,8 +92,7 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
           ],
           "like_count" => 5,
           "announcement_count" => 3,
-          "context" => "2hu",
-          "tag" => ["content", "mentioning", "nsfw"]
+          "context" => "2hu"
         },
         "published" => date,
         "context" => "2hu"
@@ -108,26 +104,26 @@ defmodule Pleroma.Web.TwitterAPI.Representers.ActivityRepresenterTest do
       "id" => activity.id,
       "user" => UserView.render("show.json", %{user: user, for: follower}),
       "is_local" => true,
-      "statusnet_html" => HtmlSanitizeEx.basic_html(content_html),
+      "statusnet_html" => content_html,
       "text" => content,
       "is_post_verb" => true,
       "created_at" => "Tue May 24 13:26:08 +0000 2016",
       "in_reply_to_status_id" => 213123,
       "statusnet_conversation_id" => convo_object.id,
       "attachments" => [
-        ObjectRepresenter.to_map(object)
+        AttachmentView.render("show.json", %{attachment: object})
       ],
       "attentions" => [
-        UserView.render("show.json", %{user: mentioned_user, for: follower})
+        UserView.render("short.json", %{user: mentioned_user})
       ],
       "fave_num" => 5,
       "repeat_num" => 3,
       "favorited" => false,
       "repeated" => false,
       "external_url" => activity.data["id"],
-      "tags" => ["content", "mentioning", "nsfw"]
+      "source" => "api"
     }
 
-    assert ActivityRepresenter.to_map(activity, %{user: user, for: follower, mentioned: [mentioned_user]}) == expected_status
+    assert StatusView.render("show.json", %{activity: activity, for: follower}) == expected_status
   end
 end
