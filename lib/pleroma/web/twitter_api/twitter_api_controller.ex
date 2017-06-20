@@ -1,6 +1,6 @@
 defmodule Pleroma.Web.TwitterAPI.Controller do
   use Pleroma.Web, :controller
-  alias Pleroma.Web.TwitterAPI.{StatusView, TwitterAPI, UserView}
+  alias Pleroma.Web.TwitterAPI.{ErrorView, StatusView, TwitterAPI, UserView}
   alias Pleroma.{Web, Repo, Activity}
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Ecto.Changeset
@@ -74,7 +74,7 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
     case TwitterAPI.follow(user, params) do
       {:ok, user, followed, _activity} ->
         render(conn, UserView, "show.json", %{user: followed, for: user})
-      {:error, msg} -> forbidden_json_reply(conn, msg)
+      {:error, msg} -> forbidden_reply(conn, msg)
     end
   end
 
@@ -82,7 +82,7 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
     case TwitterAPI.unfollow(user, params) do
       {:ok, user, unfollowed} ->
         render(conn, UserView, "show.json", %{user: unfollowed, for: user})
-      {:error, msg} -> forbidden_json_reply(conn, msg)
+      {:error, msg} -> forbidden_reply(conn, msg)
     end
   end
 
@@ -115,9 +115,7 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
   end
 
   def upload_json(conn, %{"media" => media}) do
-    response = TwitterAPI.upload(media, "json")
-    conn
-    |> json_reply(200, response)
+    json(conn, TwitterAPI.upload(media, "json"))
   end
 
   def config(conn, _params) do
@@ -157,8 +155,7 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
       render(conn, UserView, "show.json", %{user: user})
     else
       {:error, errors} ->
-      conn
-      |> json_reply(400, Poison.encode!(errors))
+        bad_request_reply(conn, Poison.encode!(errors))
     end
   end
 
@@ -171,30 +168,24 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
   end
 
   def external_profile(%{assigns: %{user: current_user}} = conn, %{"profileurl" => uri}) do
-    with {:ok, user_map} <- TwitterAPI.get_external_profile(current_user, uri),
-         response <- Poison.encode!(user_map) do
-      conn
-      |> json_reply(200, response)
+    with {:ok, user_map} <- TwitterAPI.get_external_profile(current_user, uri) do
+      json(conn, user_map)
     end
   end
 
-  defp bad_request_reply(conn, error_message) do
-    json = error_json(conn, error_message)
-    json_reply(conn, 400, json)
-  end
-
-  defp json_reply(conn, status, json) do
+  defp bad_request_reply(conn, message) do
     conn
-    |> put_resp_content_type("application/json")
-    |> send_resp(status, json)
+    |> put_status(:bad_request)
+    |> render_error(message)
   end
 
-  defp forbidden_json_reply(conn, error_message) do
-    json = error_json(conn, error_message)
-    json_reply(conn, 403, json)
+  defp forbidden_reply(conn, message) do
+    conn
+    |> put_status(:forbidden)
+    |> render_error(message)
   end
 
-  defp error_json(conn, error_message) do
-    %{"error" => error_message, "request" => conn.request_path} |> Poison.encode!
+  defp render_error(conn, message) do
+    render(conn, ErrorView, "error.json", %{request_path: conn.request_path, message: message})
   end
 end
