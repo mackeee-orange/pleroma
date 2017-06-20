@@ -1,7 +1,7 @@
 defmodule Pleroma.Web.TwitterAPI.Controller do
   use Pleroma.Web, :controller
   alias Pleroma.Web.TwitterAPI.{StatusView, TwitterAPI, UserView}
-  alias Pleroma.{Web, Repo, Activity}
+  alias Pleroma.{Repo, Activity}
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Ecto.Changeset
 
@@ -110,24 +110,10 @@ defmodule Pleroma.Web.TwitterAPI.Controller do
     |> send_resp(200, response)
   end
 
-  def help_test(conn, _params) do
-    json(conn, "ok")
-  end
-
   def upload_json(conn, %{"media" => media}) do
     response = TwitterAPI.upload(media, "json")
     conn
     |> json_reply(200, response)
-  end
-
-  def config(conn, _params) do
-    json(conn, %{
-      site: %{
-        name: Web.base_url,
-        server: Web.base_url,
-        textlimit: -1
-      }
-    })
   end
 
   def favorite(%{assigns: %{user: user}} = conn, %{"id" => id}) do
