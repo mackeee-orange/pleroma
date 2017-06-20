@@ -50,13 +50,17 @@ defmodule Pleroma.Web.Websub do
       |> to_string
 
       signature = sign(sub.secret || "", response)
-      Logger.debug(fn -> "Pushing to #{sub.callback}" end)
+      Logger.debug(fn -> "Pushing #{topic} to #{sub.callback}" end)
 
       Task.start(fn ->
-        @httpoison.post(sub.callback, response, [
+        with {:ok, %{status_code: code}} <- @httpoison.post(sub.callback, response, [
               {"Content-Type", "application/atom+xml"},
               {"X-Hub-Signature", "sha1=#{signature}"}
-            ])
+                    ]) do
+          Logger.debug(fn -> "Pushed to #{sub.callback}, code #{code}" end)
+        else e ->
+            Logger.debug(fn -> "Couldn't push to #{sub.callback}, #{inspect(e)}" end)
+        end
       end)
     end)
   end
