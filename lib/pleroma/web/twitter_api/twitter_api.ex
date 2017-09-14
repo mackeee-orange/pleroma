@@ -5,6 +5,8 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
   alias Pleroma.Web.TwitterAPI.UserView
   alias Pleroma.Web.{OStatus, CommonAPI}
   alias Pleroma.Formatter
+  alias Pleroma.Web.Streamer
+  alias Pleroma.Web.MastodonAPI.StatusView
 
   import Pleroma.Web.TwitterAPI.Utils
 
@@ -40,6 +42,10 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
          tags <- Formatter.parse_tags(status),
          object <- make_note_data(user.ap_id, to, context, content_html, attachments, inReplyTo, tags) do
       res = ActivityPub.create(to, user, context, object)
+      {:ok, activity} = res
+      json = StatusView.render("status.json", activity: activity)
+      |> Poison.encode!
+      Streamer.stream(user, %{type: "update", payload: json})
       User.update_note_count(user)
       res
     end

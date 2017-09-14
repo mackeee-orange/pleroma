@@ -3,10 +3,11 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIController do
   alias Pleroma.{Repo, Activity, User, Notification}
   alias Pleroma.Web.OAuth.App
   alias Pleroma.Web
-  alias Pleroma.Web.MastodonAPI.{StatusView, AccountView}
+  alias Pleroma.Web.MastodonAPI.{StatusView, AccountView, NotificationView}
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Pleroma.Web.TwitterAPI.TwitterAPI
   alias Pleroma.Web.CommonAPI
+  alias Pleroma.Web.Streamer
   import Ecto.Query
   import Logger
 
@@ -167,23 +168,8 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIController do
 
   def notifications(%{assigns: %{user: user}} = conn, params) do
     notifications = Notification.for_user(user, params)
-    result = Enum.map(notifications, fn (%{id: id, activity: activity, inserted_at: created_at}) ->
-      actor = User.get_cached_by_ap_id(activity.data["actor"])
-      created_at = NaiveDateTime.to_iso8601(created_at)
-      |> String.replace(~r/(\.\d+)?$/, ".000Z", global: false)
-      case activity.data["type"] do
-        "Create" ->
-          %{id: id, type: "mention", created_at: created_at, account: AccountView.render("account.json", %{user: actor}), status: StatusView.render("status.json", %{activity: activity})}
-        "Like" ->
-          liked_activity = Activity.get_create_activity_by_object_ap_id(activity.data["object"])
-          %{id: id, type: "favourite", created_at: created_at, account: AccountView.render("account.json", %{user: actor}), status: StatusView.render("status.json", %{activity: liked_activity})}
-        "Announce" ->
-          announced_activity = Activity.get_create_activity_by_object_ap_id(activity.data["object"])
-          %{id: id, type: "reblog", created_at: created_at, account: AccountView.render("account.json", %{user: actor}), status: StatusView.render("status.json", %{activity: announced_activity})}
-        "Follow" ->
-          %{id: id, type: "follow", created_at: created_at, account: AccountView.render("account.json", %{user: actor})}
-        _ -> nil
-      end
+    result = Enum.map(notifications, fn (notification) ->
+      NotificationView.render("notification.json", %{notification: notification})
     end)
     |> Enum.filter(&(&1))
 
@@ -277,6 +263,12 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIController do
            "object" => follow_activity.data["id"] # get latest Follow for these users
          }) do
       render conn, AccountView, "relationship.json", %{user: follower, target: followed}
+    end
+  end
+
+  def stream_user(%{assigns: %{user: user}} = conn, _params) do
+    Streamer.add_conn(user, conn)
+    receive do
     end
   end
 
