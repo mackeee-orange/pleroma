@@ -16,6 +16,7 @@ defmodule Pleroma.Web.Streamer do
   end
 
   def handle_cast(%{action: :stream, user: user, item: item}, users) do
+    Logger.debug("Trying to push to #{user.nickname}")
     if conn = users[user.id] do
       Logger.debug("Pushing item to #{user.id}, #{user.nickname}")
       chunk(conn, "event: #{item.type}\ndata: #{item.payload}\n\n")
