@@ -131,7 +131,8 @@ defmodule Pleroma.Web.OStatus.ActivityRepresenterTest do
   end
 
   test "a like activity" do
-    note = insert(:note)
+    note_activity = insert(:note_activity)
+    note = Object.get_by_ap_id(note_activity.data["object"]["id"])
     user = insert(:user)
     {:ok, like, _note} = ActivityPub.like(user, note)
 
