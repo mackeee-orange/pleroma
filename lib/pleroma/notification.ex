@@ -2,6 +2,8 @@ defmodule Pleroma.Notification do
   use Ecto.Schema
   alias Pleroma.{User, Activity, Notification, Repo}
   import Ecto.Query
+  alias Pleroma.Web.Streamer
+  alias Pleroma.Web.MastodonAPI.NotificationView
 
   schema "notifications" do
     field :seen, :boolean, default: false
@@ -47,8 +49,14 @@ defmodule Pleroma.Notification do
   # TODO move to sql, too.
   def create_notification(%Activity{} = activity, %User{} = user) do
     unless User.blocks?(user, %{ap_id: activity.data["actor"]}) do
-      notification = %Notification{user_id: user.id, activity_id: activity.id}
+      notification = %Notification{user: user, activity: activity}
       {:ok, notification} = Repo.insert(notification)
+
+      json = NotificationView.render("notification.json", %{notification: notification})
+      |> Poison.encode!
+
+      Streamer.stream(user, %{type: "notification", payload: json})
+
       notification
     end
   end

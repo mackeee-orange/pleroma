@@ -53,6 +53,8 @@ defmodule Pleroma.Web.Router do
   scope "/api/v1", Pleroma.Web.MastodonAPI do
     pipe_through :authenticated_api
 
+    get "/streaming/user", MastodonAPIController, :stream_user
+
     get "/accounts/verify_credentials", MastodonAPIController, :verify_credentials
     get "/accounts/relationships", MastodonAPIController, :relationships
     get "/accounts/search", MastodonAPIController, :account_search

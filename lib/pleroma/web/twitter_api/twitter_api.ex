@@ -6,6 +6,8 @@ defmodule Pleroma.Web.TwitterAPI.TwitterAPI do
   alias Pleroma.Web.{OStatus, CommonAPI}
   alias Pleroma.Formatter
   import Ecto.Query
+  alias Pleroma.Web.Streamer
+  alias Pleroma.Web.MastodonAPI.StatusView
 
   @httpoison Application.get_env(:pleroma, :httpoison)
 
