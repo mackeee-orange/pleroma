@@ -57,6 +57,13 @@ defmodule Pleroma.Notification do
 
       Streamer.stream(user, %{type: "notification", payload: json})
 
+      if activity.data["type"] == "Create" do
+        json = StatusView.render("status.json", %{activity: activity, for: user})
+        |> Poison.encode!
+
+        Streamer.stream(user, %{type: "update", payload: json})
+      end
+
       notification
     end
   end
